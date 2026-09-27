@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Thumb Flick Circular Input</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --ring: #1f2937;
+      --accent: #67e8f9;
+      --accent-2: #a78bfa;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --danger: #fca5a5;
+      --good: #86efac;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--text);
+      touch-action: none;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .viewport {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .quadrant {
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      position: relative;
+    }
+
+    .quadrant.active {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 20px;
+      gap: 16px;
+    }
+
+    .quadrant:not(.active) {
+      display: none;
+    }
+
+    .display {
+      background: rgba(17, 24, 39, 0.8);
+      border: 1px solid rgba(103, 232, 249, 0.3);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+      flex: 0 0 auto;
+    }
+
+    .label {
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .text {
+      font-size: 1.8rem;
+      line-height: 1.4;
+      word-break: break-word;
+      min-height: 48px;
+      display: flex;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .wheel-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .wheel-wrap {
+      position: relative;
+      width: 300px;
+      height: 300px;
+    }
+
+    .wheel {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at center, rgba(103,232,249,0.16), rgba(167,139,250,0.08) 35%, rgba(17,24,39,0.4) 60%, rgba(15,23,42,0.7) 100%);
+      border: 2px solid rgba(148, 163, 184, 0.28);
+      box-shadow: inset 0 0 32px rgba(103, 232, 249, 0.12), 0 22px 50px rgba(0,0,0,0.22);
+      overflow: hidden;
+    }
+
+    .ring {
+      position: absolute;
+      inset: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 1px solid rgba(148,163,184,0.2);
+      pointer-events: none;
+    }
+
+    .ring.outer { width: 94%; height: 94%; }
+    .ring.mid   { width: 68%; height: 68%; }
+    .ring.inner { width: 40%; height: 40%; }
+
+    .slot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 46px;
+      height: 46px;
+      margin-left: -23px;
+      margin-top: -23px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.18);
+      border: 1px solid transparent;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+      box-shadow: 0 0 0 rgba(103,232,249,0);
+    }
+
+    .slot.active {
+      background: rgba(103,232,249,0.18);
+      border-color: rgba(103,232,249,0.9);
+      box-shadow: 0 0 18px rgba(103,232,249,0.28);
+      transform: scale(1.16);
+    }
+
+    .slot.action {
+      background: rgba(167,139,250,0.1);
+      border-color: rgba(167,139,250,0.6);
+    }
+
+    .slot.space {
+      font-size: 0.78rem;
+    }
+
+    .center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(103,232,249,0.5), rgba(167,139,250,0.35) 36%, rgba(15,23,42,0.84) 70%);
+      border: 1px solid rgba(103, 232, 249, 0.7);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 24px rgba(103,232,249,0.2);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #cffafe;
+      pointer-events: none;
+      font-size: 0.75rem;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      text-align: center;
+      flex: 0 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport">
+    <div class="quadrant"></div>
+    <div class="quadrant"></div>
+    <div class="quadrant"></div>
+    <div class="quadrant active">
+      <div class="display">
+        <div class="label">text</div>
+        <div id="text" class="text"></div>
+      </div>
+
+      <div class="wheel-container">
+        <div class="wheel-wrap">
+          <div id="wheel" class="wheel" aria-label="thumb wheel keyboard"></div>
+          <div class="center">Flick</div>
+        </div>
+      </div>
+
+      <div class="hint">親指で円の中をなぞって1文字選択</div>
+    </div>
+  </div>
+
+  <script>
+    const textEl = document.getElementById('text');
+    const wheelEl = document.getElementById('wheel');
+
+    const layers = [
+      // outer: 12 letters
+      [
+        { char: 'A', angle: -90 }, { char: 'B', angle: -60 },
+        { char: 'C', angle: -30 }, { char: 'D', angle: 0 },
+        { char: 'E', angle: 30 },  { char: 'F', angle: 60 },
+        { char: 'G', angle: 90 },  { char: 'H', angle: 120 },
+        { char: 'I', angle: 150 }, { char: 'J', angle: 180 },
+        { char: 'K', angle: 210 }, { char: 'L', angle: 240 }
+      ],
+      // middle: 12 letters
+      [
+        { char: 'M', angle: -90 }, { char: 'N', angle: -60 },
+        { char: 'O', angle: -30 }, { char: 'P', angle: 0 },
+        { char: 'Q', angle: 30 },  { char: 'R', angle: 60 },
+        { char: 'S', angle: 90 },  { char: 'T', angle: 120 },
+        { char: 'U', angle: 150 }, { char: 'V', angle: 180 },
+        { char: 'W', angle: 210 }, { char: 'X', angle: 240 }
+      ],
+      // inner: actions
+      [
+        { char: 'Y', angle: -90 }, { char: 'Z', angle: -30 },
+        { char: ' ', angle: 30, cls: 'space' }, { char: '⌫', angle: 90, cls: 'action' },
+        { char: '.', angle: 150 }, { char: ',', angle: 210 }
+      ]
+    ];
+
+    const ringSizes = [94, 68, 40];
+    const selectedByPointer = { layer: null, index: null };
+
+    function createSlots() {
+      layers.forEach((ringItems, layerIndex) => {
+        const ring = document.createElement('div');
+        ring.className = 'ring ' + (layerIndex === 0 ? 'outer' : layerIndex === 1 ? 'mid' : 'inner');
+
+        ringItems.forEach((item, index) => {
+          const slot = document.createElement('div');
+          slot.className = 'slot ' + (item.cls || '');
+          slot.dataset.layer = layerIndex;
+          slot.dataset.index = index;
+          slot.textContent = item.char === ' ' ? 'SP' : item.char;
+
+          // the "slot" sits on the ring circumference
+          const radius = ringSizes[layerIndex] / 2 * 0.96; // within ring
+          const a = toRad(item.angle);
+          const x = Math.cos(a) * radius;
+          const y = Math.sin(a) * radius;
+
+          slot.style.transform = `translate(${x}px, ${y}px)`;
+          slot.style.position = 'absolute';
+          slot.style.left = '50%';
+          slot.style.top = '50%';
+          slot.style.marginLeft = '-23px';
+          slot.style.marginTop = '-23px';
+
+          ring.appendChild(slot);
+        });
+
+        wheelEl.appendChild(ring);
+      });
+    }
+
+    function toRad(deg) {
+      return (deg * Math.PI) / 180;
+    }
+
+    function getPointerPos(e) {
+      const rect = wheelEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const x = e.clientX - cx;
+      const y = e.clientY - cy;
+      return { x, y, cx, cy };
+    }
+
+    function layerForDistance(d) {
+      if (d > 120) return 0;
+      if (d > 70) return 1;
+      return 2;
+    }
+
+    function chooseSlotFromAngle(layerIndex, angleDeg) {
+      const items = layers[layerIndex];
+      const angle = ((angleDeg + 360) % 360 + 360) % 360;
+      // nearest slot in the current ring
+      let best = { idx: 0, bestDiff: 999 };
+      items.forEach((item, idx) => {
+        const diff = Math.min(Math.abs(angle - item.angle), 360 - Math.abs(angle - item.angle));
+        if (diff < best.bestDiff) {
+          best = { idx, bestDiff: diff };
+        }
+      });
+      return best.idx;
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+      selectedByPointer.layer = null;
+      selectedByPointer.index = null;
+    }
+
+    function highlightSelected(layerIndex, index) {
+      clearSelection();
+      const target = document.querySelector(`.slot[data-layer="${layerIndex}"][data-index="${index}"]`);
+      if (target) {
+        target.classList.add('active');
+        selectedByPointer.layer = layerIndex;
+        selectedByPointer.index = index;
+      }
+    }
+
+    let active = false;
+    let activePointerId = null;
+
+    wheelEl.addEventListener('pointerdown', (e) => {
+      active = true;
+      activePointerId = e.pointerId;
+      wheelEl.setPointerCapture(e.pointerId);
+      const pos = getPointerPos(e);
+      const dist = Math.hypot(pos.x, pos.y);
+      const layer = layerForDistance(dist);
+      const angle = Math.atan2(pos.y, pos.x) * 180 / Math.PI;
+      const idx = chooseSlotFromAngle(layer, angle);
+      highlightSelected(layer, idx);
+    });
+
+    wheelEl.addEventListener('pointermove', (e) => {
+      if (!active || e.pointerId !== activePointerId) return;
+      const pos = getPointerPos(e);
+      const dist = Math.hypot(pos.x, pos.y);
+      const layer = layerForDistance(dist);
+      const angle = Math.atan2(pos.y, pos.x) * 180 / Math.PI;
+      const idx = chooseSlotFromAngle(layer, angle);
+      highlightSelected(layer, idx);
+    });
+
+    function appendText(ch) {
+      if (ch === '⌫') {
+        textEl.textContent = textEl.textContent.slice(0, -1);
+        return;
+      }
+      if (ch === ' ') {
+        textEl.textContent += ' ';
+        return;
+      }
+      textEl.textContent += ch;
+    }
+
+    wheelEl.addEventListener('pointerup', (e) => {
+      if (!active || e.pointerId !== activePointerId) return;
+      const layer = selectedByPointer.layer;
+      const index = selectedByPointer.index;
+
+      if (layer !== null && index !== null) {
+        const ch = layers[layer][index].char;
+        appendText(ch);
+      }
+
+      active = false;
+      activePointerId = null;
+      clearSelection();
+    });
+
+    wheelEl.addEventListener('pointerleave', () => {
+      if (!active) return;
+      clearSelection();
+    });
+
+    window.addEventListener('pointerup', () => {
+      if (!active) return;
+      active = false;
+      activePointerId = null;
+      clearSelection();
+    });
+
+    // initialize
+    createSlots();
+    textEl.textContent = '';
+  </script>
+</body>
+</html>
